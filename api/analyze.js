@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const { image, mime, symptoms } = body || {};
   if (!image) return res.status(400).json({ error: 'No image provided' });
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY || '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';
   if (!apiKey) return res.status(500).json({ error: 'API key not configured on server.' });
 
   const symptomsText = symptoms || 'No description — analyze from image only.';
