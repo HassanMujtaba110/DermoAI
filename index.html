@@ -545,8 +545,6 @@ function startLoading(){
 
 // ── ANALYZE ──
 async function analyze(){
-  const apiKey = localStorage.getItem('db_apikey');
-  if(!apiKey){ showKeyModal(); return; }
   if(!b64){alert('Please upload a photo first.');return;}
   if(getUsed()>=FREE&&localStorage.getItem('db_pro')!=='1'){openUpgrade();return;}
 
@@ -557,51 +555,27 @@ async function analyze(){
   const timer=startLoading();
 
   const sym=document.getElementById('sym').value.trim();
-  const symptomsText = sym || 'No description — analyze from image only.';
-
-  const prompt=`You are DermBot, a skincare education assistant for South Asian users.
-
-FIRST — check if the uploaded image shows human skin (face, neck, back, chest, arms etc.).
-If it does NOT show human skin (book, food, object, animal, text, screenshot), respond ONLY with:
-{"not_skin":true,"message":"This doesn't look like a skin photo. Please upload a clear photo of the skin area you want to analyze."}
-
-If it IS a skin photo, respond ONLY with this JSON — no markdown, no extra text:
-{"condition":"Short name e.g. Mild inflammatory acne","severity":"mild or moderate or severe","explanation":"2-3 sentences starting with Your skin shows signs of... Never definitively diagnose.","triggers":"2-3 sentences about likely causes: diet, stress, climate, products","routine_am":["Step 1: ...","Step 2: ...","Step 3: ..."],"routine_pm":["Step 1: ...","Step 2: ...","Step 3: ..."],"use":["ingredient 1","ingredient 2","ingredient 3","ingredient 4"],"avoid":["ingredient 1","ingredient 2","ingredient 3"],"doctor":"One sentence: see a dermatologist if..."}
-
-Rules: Only OTC-safe ingredients (niacinamide, salicylic acid max 2%, benzoyl peroxide max 2.5%, hyaluronic acid, ceramides, gentle cleansers, SPF 30+, azelaic acid 10%). Never prescriptions. Consider South Asian hyperpigmentation tendency.
-
-User description: "${symptomsText}"`;
 
   try{
-    const res=await fetch('https://api.openai.com/v1/chat/completions',{
+    const res=await fetch('/api/analyze',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+apiKey
-      },
-      body:JSON.stringify({
-        model:'gpt-4o',
-        max_tokens:1000,
-        messages:[{
-          role:'user',
-          content:[
-            {type:'image_url',image_url:{url:'data:'+fType+';base64,'+b64,detail:'high'}},
-            {type:'text',text:prompt}
-          ]
-        }]
-      })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image:b64, mime:fType, symptoms:sym})
     });
 
     const data=await res.json();
     clearInterval(timer);
 
+    if(data.error==='rate_limit'){
+      document.getElementById('loading').style.display='none';
+      document.getElementById('abtn').style.display='flex';
+      openUpgrade(); return;
+    }
+
     if(data.error){
       document.getElementById('loading').style.display='none';
       document.getElementById('abtn').style.display='flex';
-      let msg=data.error.message||'API error.';
-      if(data.error.code==='invalid_api_key') msg='API key galat hai. Dobara check karo.';
-      if(data.error.code==='insufficient_quota') msg='OpenAI credits khatam ho gaye. platform.openai.com pe recharge karo.';
-      showError(msg); return;
+      showError(data.error); return;
     }
 
     const raw=(data.choices[0].message.content||'').trim().replace(/```json|```/g,'').trim();
